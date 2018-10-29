@@ -1,0 +1,9 @@
+bin
+*.o
+*.d
+reference
+cmr
+IntelPCM2.8/*.o
+IntelPCM2.8/*.a
+IntelPCM2.8/*.d
+tags

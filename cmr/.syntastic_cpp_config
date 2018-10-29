@@ -1,0 +1,7 @@
+-Wall
+-O3
+-I.
+-I./IntelPCM2.8
+-lrt
+-lpcm
+-lpthread
