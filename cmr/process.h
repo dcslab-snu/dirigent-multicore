@@ -85,11 +85,15 @@ struct monitor_c;
 
 struct process_manager_c {
   monitor_c* m_monitor;
-  process_c* m_process[MAX_PROCESS_NUM];
-  process_c* m_process_bak[MAX_PROCESS_NUM];
-  int     process_num;
-  int     fg_num;
-  int     bak_process_num;
+  process_c* m_process[MAX_PROCESS_NUM];      // processes (FG or BG)
+  process_c* m_process_bak[MAX_PROCESS_NUM];  // processes which runs the same cores with m_process
+  int     process_num;                        // the number of m_process
+  int     fg_num;                             // the number of fg process in m_process
+  int     bak_process_num;                    // the number of overlapped process with m_process (=the number of m_process_bak)
+  string  fg_name;
+  string  bg_name;
+  string  input_size;
+
 
   float   bg_slow_ratio;
   float   fg_slow_ratio;

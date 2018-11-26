@@ -98,8 +98,13 @@ process_manager_c::process_manager_c(char* filename)
     ifile >> bg_names[i];
   }*/
   /* get FG name */
-  string fg_name;
-  ifile >> fg_name;
+  string fg_workload_name;
+  ifile >> fg_workload_name;
+  fg_name = fg_workload_name;
+
+  string bg_workload_name;
+  ifile >> bg_workload_name;
+  bg_name = bg_workload_name;
 
 
   /* input file format:
@@ -117,6 +122,17 @@ process_manager_c::process_manager_c(char* filename)
     string core_ids_str;
     //ifile >> t_proc->core_id;
     ifile >> core_ids_str;
+    int str_len = core_ids_str.size();
+    cout << "core_ids_str["<< str_len-1 <<"] : ";
+    if (str_len > 0) {
+      cout << core_ids_str[str_len - 1] << endl;
+    }
+    else{
+      cout<< "None" << endl;
+    }
+    if(core_ids_str[str_len-1] != ','){
+      cout << "some cpu affinity settings are not ended with comma (e.g., 0,)"<< endl;
+    }
     // TODO: t_proc->core_id should be changed to core_ids (in .cfg file, cpu affinity must end with comma)
     // e.g., 0,1,2,3,4,5,6,7,
     size_t pos = 0;
@@ -124,10 +140,10 @@ process_manager_c::process_manager_c(char* filename)
     string token;
     while ((pos = core_ids_str.find(core_ids_del)) != string::npos) {
       token = core_ids_str.substr(0, pos);
-      //cout << "token:"<<token << endl;
-      //cout << "ci_count:"<<ci_count << endl;
+      cout << "[while] token: "<<token << endl;
+      cout << "[while] ci_count: "<<ci_count << endl;
       t_proc->core_ids[ci_count]= stoi(token);
-      //cout << "t_proc->core_ids:"<<t_proc->core_ids[ci_count] << endl;
+      cout << "[while] t_proc->core_ids: "<<t_proc->core_ids[ci_count] << endl;
       core_ids_str.erase(0, pos+core_ids_del.length());
       ci_count++;
     }
@@ -174,7 +190,7 @@ process_manager_c::process_manager_c(char* filename)
       assert(ret != -1);
       char* file_memory = (char*)mmap (NULL, SM_SIZE, PROT_WRITE|PROT_READ, MAP_SHARED, fd, 0);
       assert(file_memory != (void*)-1);
-
+      cerr<<"mmap: passed" << endl;
       t_proc->fg = true;
       //get fg_name
       /*t_proc->name_len = fg_names[process_num].length();
@@ -229,7 +245,9 @@ process_manager_c::process_manager_c(char* filename)
     append_cmd(t_proc, "-c");
     // TODO: t_proc->core_id should be changed to core_ids -> for loop for core_id
     //m_cmd = '0' + t_proc->core_id;
+    cout << "t_proc->ci_count: "<< t_proc->ci_count << endl;
     for (int j=0; j<t_proc->ci_count; j++){
+      cout << "t_proc->core_ids["<<j<<"]: "<< t_proc->core_ids[j] << endl;
       if (j==t_proc->ci_count-1) {m_cmd = m_cmd + to_string(t_proc->core_ids[j]);}
       else{
         m_cmd = m_cmd + to_string(t_proc->core_ids[j]) + ",";
@@ -245,26 +263,43 @@ process_manager_c::process_manager_c(char* filename)
 
     while (ifile.peek() != '\n') {
       ifile >> m_cmd;
+      if (m_cmd == "native" || m_cmd == "simmedium"){
+        input_size = m_cmd;
+      }
       append_cmd(t_proc, m_cmd);
     }
     int j = t_proc->cmd_len;
     t_proc->cmd[j] = NULL;
-
+    cerr<<"append_cmd: passed" << endl;
     /* check if this is the first process to run on a core */
     bool handled = false;
     for (int j=0; j<MAX_PROCESS_NUM; j++) {
       // FIXME: t_proc->core_id should be changed to core_ids -> for loop for core_id
       int count = 0;
       int out = 0;
+      int overlapped = 0;
+      cout<<"m_process["<<j<<"]: " << m_process[j]<< endl;
+      //cout<<"m_process["<<j<<"]->ci_count: " << m_process[j]->ci_count<< endl;
       if (m_process[j] != NULL){
         // check if t_proc is the m_process[j] which is bak_ground process
+        //cerr<<"m_process["<<j<<"]->ci_count:" << m_process[j]->ci_count<< endl;
         for (int k=0; k<m_process[j]->ci_count; k++){
           // if any core id do not match to t_proc core ids, then break!
-          if (m_process[j]->core_ids[k] == t_proc->core_ids[k]){
+          cout<< "[count loop] m_process["<<j<<"]->core_ids["<<k<<"]: "<<m_process[j]->core_ids[k];
+          cout<< ", ci_count : "<< m_process[j]->ci_count << endl;
+          cout<< "[count loop] t_proc->core_ids["<<k<<"]: "<<t_proc->core_ids[k];
+          cout<< ", ci_count : "<< t_proc->ci_count << endl;
+          if (m_process[j]->core_ids[k] == t_proc->core_ids[k]) {
             count++;
+            cout << "count:" << count << " ,m_process[" << j << "]->ci_count: " << m_process[j]->ci_count << endl;
+            if (m_process[j]->ci_count-1 == count){
+              overlapped = 1;
+            }
           }
         }
-        if (count==m_process[j]->ci_count-1){
+        // Comparing the t_proc's core counts with m_process[j]->ci_count...
+        // The below code finds whether the t_proc is overlapped with m_process[j]..
+        if (count==m_process[j]->ci_count-1 && overlapped){
           m_process_bak[bak_process_num] = t_proc;
           bak_process_num ++;
           handled = true;
@@ -278,16 +313,21 @@ process_manager_c::process_manager_c(char* filename)
       m_process[process_num] = t_proc;
       process_num ++;
     }
+    cout << "process_num : "<< process_num << endl;
   }
 
   /* bak process number should be the same as process number
    * to ensure 1:1 relation between proc and bak proc */
+  cout << "bak_process_num : " << bak_process_num <<endl;
+  cout << "fg_num : " << fg_num <<endl;
+  cout << "process_num : " << process_num <<endl;
   if (bak_process_num != 0)
     assert(process_num == bak_process_num+fg_num);
 
   ifile.close();
-
-  m_monitor = new monitor_c(m_process, process_num, fg_num, fg_name, this);
+  cerr<<"before monitor_c: passed" << endl;
+  m_monitor = new monitor_c(m_process, process_num, fg_num, fg_workload_name, this);
+  cerr<<"after monitor_c: passed" << endl;
   if (use_partitioning)
     init_partition();
 
@@ -417,10 +457,14 @@ void process_manager_c::start_process(process_c* p)
 
   pid_t pid = fork();
   if (pid == 0) { /* child */
-
+    /// Redirect Output to STDOUT
     /* create file for stdout */
     // TODO: t_proc->core_id should be changed to core_ids -> for loop for core_id
     string filename;
+    string base_path = "../logs/"+input_size+"/";
+    //string filename_tmp = "proc_";
+    string filename_tmp = fg_name+"_"+bg_name+".log";
+    /*
     string filename_tmp = "proc_";
     string affinity;
     for (int i=0; i<p->ci_count; i++){
@@ -430,7 +474,8 @@ void process_manager_c::start_process(process_c* p)
       }
     }
     filename = filename_tmp + affinity + ".out";
-
+    */
+    filename = base_path + filename_tmp;
     p->fd = open(filename.c_str(),
         O_CREAT|O_APPEND|O_WRONLY, 0644);
     if (p->fd < 0)
@@ -439,6 +484,8 @@ void process_manager_c::start_process(process_c* p)
     /* redirect stdout and stderr to newfd */
     dup2(p->fd, STDOUT_FILENO);
     dup2(p->fd, STDERR_FILENO);
+
+    ///
 
     // FIXME: Measuring TSC values and Initialize Execution times (in seconds)
     m_monitor->m_MSR_handle[0]->read(16, &p->start_tsc);

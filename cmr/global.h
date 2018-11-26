@@ -26,7 +26,8 @@
 
 
 /* Shared memory configuration */
-#define SM_SIZE 256
+//#define SM_SIZE 256
+#define SM_SIZE 65536*1024  //64MB
 //#define PRINT_SAMPLES
 
 #define ROTATE_PROB 0.05
