@@ -1,7 +1,7 @@
 -Wall
 -O3
 -I.
--I./IntelPCM2.8
+-I./pcm
 -lrt
--lpcm
+-lPCM
 -lpthread

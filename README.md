@@ -5,6 +5,15 @@ How to build and run it?
 ```bash
 git submodule init
 git submodule update
+
+
+## cmake way
+cd ${DIRIGENT_HOME}/cmr
+cmake .
+make -f Makefile
+
+
+## make way
 cd ${DIRIGENT_HOME}/cmr/pcm
 make
 cd ${DIRIGENT_HOME}/cmr
